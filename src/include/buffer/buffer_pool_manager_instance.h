@@ -76,15 +76,15 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
   /**
    * Flushes the target page to disk.
-   * @param page_id id of page to be flushed, cannot be 
+   * @param page_id id of page to be flushed, cannot be
    * @return false if the page could not be found in the page table, true otherwise
    */
   auto FlushPgImp(page_id_t page_id) -> bool override;
 
   void flush_pg(page_id_t page_id, int frame_id);
 
-  // auto find_frame_id(page_id_t page_id) -> 
-  int find_frame_id (page_id_t page_id);
+  // auto find_frame_id(page_id_t page_id) ->
+  int find_frame_id(page_id_t page_id);
 
   /**
    * Creates a new page in the buffer pool.
