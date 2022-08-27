@@ -76,10 +76,15 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
   /**
    * Flushes the target page to disk.
-   * @param page_id id of page to be flushed, cannot be INVALID_PAGE_ID
+   * @param page_id id of page to be flushed, cannot be 
    * @return false if the page could not be found in the page table, true otherwise
    */
   auto FlushPgImp(page_id_t page_id) -> bool override;
+
+  void flush_pg(page_id_t page_id, int frame_id);
+
+  // auto find_frame_id(page_id_t page_id) -> 
+  int find_frame_id (page_id_t page_id);
 
   /**
    * Creates a new page in the buffer pool.
@@ -144,5 +149,7 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   std::list<frame_id_t> free_list_;
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
   std::mutex latch_;
+
+  // std::unordered_map<page_id_t, int> page_to_frame;
 };
 }  // namespace bustub

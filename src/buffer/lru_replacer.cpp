@@ -28,8 +28,8 @@ auto LRUReplacer::Victim(frame_id_t *frame_id) -> bool {
 
     replacer_mutex.lock();
     
-    int frame_id_min = lru_replacer.begin()->first;
-    frame_id_t timestamp_min = lru_replacer.begin()->second;
+    frame_id_t frame_id_min = lru_replacer.begin()->first;
+    int timestamp_min = lru_replacer.begin()->second;
 
     for (auto it = lru_replacer.begin(); it!=lru_replacer.end(); ++it){
         if (it->second < timestamp_min){
