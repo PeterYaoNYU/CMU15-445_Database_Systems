@@ -47,10 +47,19 @@ class LRUReplacer : public Replacer {
   auto Size() -> size_t override;
 
  private:
+  bool IsInReplacer(frame_id_t frame_id);
+
+/** A linked list of pages waiting to be evicted. */
+  std::list<frame_id_t> wait_list_{};
+
+/** The iterator in this vector points to wait_list_. */
+  std::vector<std::list<frame_id_t>::iterator> page2iter_;
+
+  std::mutex latch_{};
   // TODO(student): implement me!
-  int timestamp;
-  std::unordered_map<frame_id_t, int> lru_replacer;
-  std::mutex replacer_mutex;
+  // int timestamp;
+  // std::unordered_map<frame_id_t, int> lru_replacer;
+  // std::mutex replacer_mutex;
 };
 
 }  // namespace bustub
