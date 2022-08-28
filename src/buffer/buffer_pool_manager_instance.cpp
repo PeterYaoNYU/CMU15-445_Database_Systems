@@ -236,6 +236,7 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
     memset(pages_[frame_id].GetData(), 0, PAGE_SIZE);
     // return it to the free list;
     free_list_.push_back(frame_id);
+    return true;
   }
   return false;
 }

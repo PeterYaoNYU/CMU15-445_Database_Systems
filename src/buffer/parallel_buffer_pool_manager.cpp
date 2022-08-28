@@ -27,7 +27,15 @@ ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_
 }
 
 // Update constructor to destruct all BufferPoolManagerInstances and deallocate any associated memory
-ParallelBufferPoolManager::~ParallelBufferPoolManager() = default;
+ParallelBufferPoolManager::~ParallelBufferPoolManager() {
+  printf("destructing...\n");
+  for (size_t i =0; i < num_instances_; i++){
+    delete managers_[i];
+  }
+  printf("done destructing each manager instance\n");
+  // delete &managers_;
+  // printf("done destructing all \n");
+}
 
 auto ParallelBufferPoolManager::GetPoolSize() -> size_t {
   // Get size of all BufferPoolManagerInstances
@@ -71,13 +79,16 @@ auto ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) -> Page * {
   // starting index and return nullptr
   // 2.   Bump the starting index (mod number of instances) to start search at a different BPMI each time this function
   // is called
-  return nullptr;
+  printf("calling new page imp\n");
+  // return nullptr;
   size_t trials = 0;
   Page *page_ptr;
   while (trials++ < num_instances_) {
-    starting_index = (starting_index + 1) % num_instances_;
+    // starting_index = (starting_index + 1) % num_instances_;
     if ((page_ptr = managers_[starting_index]->NewPage(page_id)) != nullptr) {
       return page_ptr;
+    } else{
+      starting_index = (starting_index + 1) % num_instances_;
     }
   }
   return nullptr;
@@ -86,7 +97,7 @@ auto ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) -> Page * {
 auto ParallelBufferPoolManager::DeletePgImp(page_id_t page_id) -> bool {
   // Delete page_id from responsible BufferPoolManagerInstance
   return GetBufferPoolManager(page_id)->DeletePage(page_id);
-  return false;
+  // return false;
 }
 
 void ParallelBufferPoolManager::FlushAllPgsImp() {
