@@ -46,7 +46,7 @@ auto HASH_TABLE_TYPE::Hash(KeyType key) -> uint32_t {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 inline auto HASH_TABLE_TYPE::KeyToDirectoryIndex(KeyType key, HashTableDirectoryPage *dir_page) -> uint32_t {
-  return 0;
+  return Hash(key) & dir_page->GetGlobalDepthMask();
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
