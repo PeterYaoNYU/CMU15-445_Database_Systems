@@ -40,6 +40,8 @@ TEST(HashTableTest, SampleTest) {
 
   ht.VerifyIntegrity();
 
+  printf("!!!!!!!!!!!!!!\n Done insert a few values\n");
+
   // check if the inserted values are all there
   for (int i = 0; i < 5; i++) {
     std::vector<int> res;
@@ -49,6 +51,8 @@ TEST(HashTableTest, SampleTest) {
   }
 
   ht.VerifyIntegrity();
+
+  printf("!!!!!!!!!!!!!!\n Done checking if the inserted values are all there\n");
 
   // insert one more value for each key
   for (int i = 0; i < 5; i++) {
@@ -78,6 +82,8 @@ TEST(HashTableTest, SampleTest) {
 
   ht.VerifyIntegrity();
 
+  printf("!!!!!!!!!!!!!!\n Done inserting one more value for each key\n");
+
   // look for a key that does not exist
   std::vector<int> res;
   ht.GetValue(nullptr, 20, &res);
@@ -98,6 +104,8 @@ TEST(HashTableTest, SampleTest) {
   }
 
   ht.VerifyIntegrity();
+
+  printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!done deleting some values.\n");
 
   // delete all values
   for (int i = 0; i < 5; i++) {

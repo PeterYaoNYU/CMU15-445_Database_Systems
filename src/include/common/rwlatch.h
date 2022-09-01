@@ -34,15 +34,18 @@ class ReaderWriterLatch {
 
   DISALLOW_COPY(ReaderWriterLatch);
 
+  uint32_t get_reader_count() { return reader_count_; }
   /**
    * Acquire a write latch.
    */
   void WLock() {
     std::unique_lock<mutex_t> latch(mutex_);
+    // printf("inside the Wlock(), checking writer_entered_\n");
     while (writer_entered_) {
       reader_.wait(latch);
     }
     writer_entered_ = true;
+    // printf("waiting for the reader_count: %d\n", reader_count_);
     while (reader_count_ > 0) {
       writer_.wait(latch);
     }
@@ -66,6 +69,7 @@ class ReaderWriterLatch {
       reader_.wait(latch);
     }
     reader_count_++;
+    // printf("Rlock evoked, current reader_count_: %d\n", reader_count_);
   }
 
   /**
@@ -74,6 +78,7 @@ class ReaderWriterLatch {
   void RUnlock() {
     std::lock_guard<mutex_t> guard(mutex_);
     reader_count_--;
+    // printf("Rulock() evoked, current reader_count_: %d\n", reader_count_);
     if (writer_entered_) {
       if (reader_count_ == 0) {
         writer_.notify_one();

@@ -40,6 +40,7 @@ class HashTableBucketPage {
   // Delete all constructor / destructor to ensure memory safety
   HashTableBucketPage() = delete;
 
+  void print_bucket();
   /**
    * Scan the bucket and collect values that have the matching key
    *
