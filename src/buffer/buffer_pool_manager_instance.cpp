@@ -51,7 +51,7 @@ BufferPoolManagerInstance::~BufferPoolManagerInstance() {
 }
 
 // use the page_id to find the corresponding frame_id
-int BufferPoolManagerInstance::find_frame_id(page_id_t page_id) {
+int BufferPoolManagerInstance::FindFrameId(page_id_t page_id) {
   // std::lock_guard<std::mutex> lock_guard(latch_);
   auto it = page_table_.find(page_id);
   if (it == page_table_.end()) {
@@ -68,7 +68,7 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
 
   if (page_id == INVALID_PAGE_ID) return false;
 
-  int frame_id = find_frame_id(page_id);
+  int frame_id = FindFrameId(page_id);
   if (frame_id == -1) return false;
 
   flush_pg(page_id, frame_id);
@@ -167,7 +167,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   // printf("fetching page %d\n", page_id);
   // page_id_t page_id;
 
-  frame_id_t frame_id = find_frame_id(page_id);
+  frame_id_t frame_id = FindFrameId(page_id);
   if (frame_id >= 0) {
     replacer_->Pin(frame_id);
     pages_[frame_id].pin_count_++;
@@ -213,7 +213,7 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
 
   printf("deleting\n");
 
-  frame_id_t frame_id = find_frame_id(page_id);
+  frame_id_t frame_id = FindFrameId(page_id);
   if (frame_id < 0) {
     return true;
   } else if (frame_id >= 0) {
@@ -247,7 +247,7 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
   // printf("unpinning %d\n", page_id);
 
   // printf("finding\n");
-  auto frame_id = find_frame_id(page_id);
+  auto frame_id = FindFrameId(page_id);
   // printf("return from find\n");
   // printf("the frame id found: %d\n", frame_id);
 

@@ -21,6 +21,9 @@
 #include "common/rid.h"
 #include "container/hash/extendible_hash_table.h"
 
+using std::cout;
+using std::endl;
+
 namespace bustub {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -53,6 +56,7 @@ HASH_TABLE_TYPE::ExtendibleHashTable(const std::string &name, BufferPoolManager 
   buffer_pool_manager_->UnpinPage(directory_page_id_, 1);
   buffer_pool_manager_->UnpinPage(bucket_0_page_id_, 0);
   buffer_pool_manager_->UnpinPage(bucket_1_page_id_, 0);
+  std::cout<<"BUCKET SIZE: "<<BUCKET_ARRAY_SIZE<<std::endl;
 }
 
 /*****************************************************************************
@@ -73,20 +77,24 @@ auto HASH_TABLE_TYPE::Hash(KeyType key) -> uint32_t {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 inline auto HASH_TABLE_TYPE::KeyToDirectoryIndex(KeyType key, HashTableDirectoryPage *dir_page) -> uint32_t {
   uint32_t mask_ = dir_page->GetGlobalDepthMask();
+  dir_page->PrintDirectory();
   uint32_t index_now_ = Hash(key) & mask_;
-  // printf("mask: %d, index_now: %d\n", mask_, index_now_);
-  // printf("finding the directory index\n");
-  while (!dir_page->GetBucketPageId(index_now_)) {
-    printf("recursing\n");
-    index_now_ = Hash(key) & (mask_ >> 1);
+  cout<<"mask_ "<<mask_<<endl;
+  cout<<"index now: "<<index_now_<<endl;
+
+  while (!dir_page->GetLocalDepth(index_now_)) {
+    cout<<"mask_ "<<mask_<<endl;
+    mask_ = mask_ >>1;
+    index_now_ = Hash(key) & mask_;
+    cout<<"index now: "<<index_now_<<endl;
   }
-  // printf("done finding the directory index\n");
   return index_now_;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 inline auto HASH_TABLE_TYPE::KeyToPageId(KeyType key, HashTableDirectoryPage *dir_page) -> uint32_t {
   uint32_t bucket_idx_ = KeyToDirectoryIndex(key, dir_page);
+  cout<<"KeyToPageId bucket_idx: "<<bucket_idx_<<endl;
   return dir_page->GetBucketPageId(bucket_idx_);
 }
 
@@ -119,6 +127,7 @@ auto HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
 
   auto dir_page_data_ = FetchDirectoryPage();
   auto bucket_page_id_ = KeyToPageId(key, dir_page_data_);
+  cout<<"get value bucket page id "<<bucket_page_id_<<endl;
   auto [bucket_page_, bucket_page_data_] = FetchBucketPage(bucket_page_id_);
 
   bucket_page_->RLatch();
@@ -127,6 +136,7 @@ auto HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   // maybe unpinning will cause a reace condition since there is pincount -- involved!
   // but then again what about fetching
   // bucket_page_->RUnlatch();
+  cout<<"found flag "<<found_flag_<<endl;
 
   buffer_pool_manager_->UnpinPage(bucket_page_id_, 0);
   buffer_pool_manager_->UnpinPage(directory_page_id_, 0);
@@ -174,12 +184,12 @@ auto HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
     buffer_pool_manager_->UnpinPage(bucket_page_id_, 0);
     bucket_page_->WUnlatch();
     table_latch_.RUnlock();
-    // printf("Insert...............................table_latch reader_count: %d\n", table_latch_.get_reader_count());
 
     return SplitInsert(transaction, key, value);
   }
 
   bool success_flag_ = bucket_page_data_->Insert(key, value, comparator_);
+  cout<<"insert "<<bucket_page_id_<<endl;
 
   // not sure if the directory page should be considered dirty or not
   buffer_pool_manager_->UnpinPage(directory_page_id_, 0);
@@ -187,6 +197,8 @@ auto HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   bucket_page_->WUnlatch();
   table_latch_.RUnlock();
   // printf("Insert...............................table_latch reader_count: %d\n", table_latch_.get_reader_count());
+  cout<<"insert success state: "<<success_flag_<<endl;
+  cout<<bucket_page_data_->KeyAt(66)<<" "<<bucket_page_data_->ValueAt(66)<<endl;
 
   return success_flag_;
 }
@@ -204,34 +216,46 @@ auto HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   auto bucket_idx_ = KeyToDirectoryIndex(key, dir_page_data_);
   bool split_flag_ = false;
   page_id_t new_bucket_page_id_;
-
+  cout<<"here comes the splitting"<<endl;
   // here comes the splitting !
   if (bucket_page_data_->IsFull()) {
     split_flag_ = true;
     auto new_bucket_page_ = (buffer_pool_manager_->NewPage(&new_bucket_page_id_));
-    auto new_bucket_idx_ = std::pow(2, dir_page_data_->GetLocalDepth(bucket_idx_));
+    auto new_bucket_idx_ = static_cast<uint32_t>(std::pow(2, dir_page_data_->GetLocalDepth(bucket_idx_)) );
+
+    auto new_bucket_page_data_ = reinterpret_cast<HASH_TABLE_BUCKET_TYPE*>(new_bucket_page_->GetData() );
 
     dir_page_data_->SetBucketPageId(new_bucket_idx_, new_bucket_page_id_);
     dir_page_data_->SetLocalDepth(new_bucket_idx_, dir_page_data_->GetLocalDepth(bucket_idx_));
-
+    cout<<"done setting bucket page id, new_bucket_idx_: "<<new_bucket_idx_<<" bucket_page_id: "<<new_bucket_page_id_<<endl;
     // auto new_bucket_page_data_ = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(new_bucket_page_->GetData());
     dir_page_data_->IncrLocalDepth(new_bucket_idx_);
     dir_page_data_->IncrLocalDepth(bucket_idx_);
     if (dir_page_data_->GetLocalDepth(new_bucket_idx_) > dir_page_data_->GetGlobalDepth()) {
       dir_page_data_->IncrGlobalDepth();
     }
+    cout<<"done incrementing depths"<<endl;
     // reinsert everything that is in the old bucket idx
     for (int i = 0; i < static_cast<int>(BUCKET_ARRAY_SIZE); i++) {
       if (bucket_page_data_->IsReadable(i)) {
-        bucket_page_->WLatch();
-        new_bucket_page_->WLatch();
+        // bucket_page_->WLatch();
+        // new_bucket_page_->WLatch();
+        // cout<<"done getting two pages locked up"<<endl;
         KeyType old_key = bucket_page_data_->KeyAt(i);
         ValueType old_val = bucket_page_data_->ValueAt(i);
-        Insert(transaction, old_key, old_val);
-        bucket_page_->WUnlatch();
-        new_bucket_page_->WUnlatch();
+        auto dir_idx = KeyToDirectoryIndex(old_key, dir_page_data_);
+        if (! dir_idx ^ new_bucket_idx_){
+          bucket_page_->WLatch();
+          bucket_page_data_->RemoveAt(i);
+          bucket_page_->WUnlatch();
+
+          new_bucket_page_->WLatch();
+          new_bucket_page_data_->Insert(old_key, old_val, comparator_);
+          new_bucket_page_->WUnlatch();
+        }
       }
     }
+    cout<<"done reinserting everything"<<endl;
   } else {
     table_latch_.WUnlock();
     // printf("split insert...............................table_latch reader_count: %d\n",
@@ -250,7 +274,7 @@ auto HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   // printf("split insert...............................table_latch reader_count: %d\n",
   // table_latch_.get_reader_count());
 
-  return true;
+  return Insert(transaction, key, value);
 }
 
 /*****************************************************************************

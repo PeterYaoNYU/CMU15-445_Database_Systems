@@ -83,8 +83,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
   void flush_pg(page_id_t page_id, int frame_id);
 
-  // auto find_frame_id(page_id_t page_id) ->
-  int find_frame_id(page_id_t page_id);
+  // auto FindFrameId(page_id_t page_id) ->
+  int FindFrameId(page_id_t page_id);
 
   /**
    * Creates a new page in the buffer pool.

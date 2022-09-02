@@ -45,6 +45,7 @@ auto HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
     }
     if (cmp(key, KeyAt(i)) == 0) {
       (*result).push_back(array_[i].second);
+      flag_ = true;
     }
   }
   return flag_;
@@ -87,6 +88,7 @@ auto HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
     return false;
   }
   array_[i] = std::make_pair(key, value);
+  // std::cout<<"key: "<<key<<" is inserted at bucket idx "<<i<<std::endl;
   occupied_[i / 8] |= mask;
   readable_[i / 8] |= mask;
   return true;
