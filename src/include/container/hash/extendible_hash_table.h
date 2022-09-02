@@ -14,6 +14,7 @@
 
 #include <queue>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "buffer/buffer_pool_manager.h"
@@ -134,7 +135,7 @@ class ExtendibleHashTable {
    * @param bucket_page_id the page_id to fetch
    * @return a pointer to a bucket page
    */
-  auto FetchBucketPage(page_id_t bucket_page_id) -> HASH_TABLE_BUCKET_TYPE *;
+  auto FetchBucketPage(page_id_t bucket_page_id) -> std::pair<Page *, HASH_TABLE_BUCKET_TYPE *>;
 
   /**
    * Performs insertion with an optional bucket splitting.

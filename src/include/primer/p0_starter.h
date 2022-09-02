@@ -182,7 +182,7 @@ class RowMatrix : public Matrix<T> {
    * @throws OUT_OF_RANGE if `source` is incorrect size
    */
   void FillFrom(const std::vector<T> &source) override {
-    if ((int)source.size() != this->cols_ * this->rows_) {
+    if (static_cast<int>(source.size()) != this->cols_ * this->rows_) {
       // throw bustub::exception::OUT_OF_RANGE;
       throw bustub::ExceptionType::OUT_OF_RANGE;
     }
