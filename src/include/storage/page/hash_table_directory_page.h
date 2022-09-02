@@ -33,6 +33,14 @@ namespace bustub {
  */
 class HashTableDirectoryPage {
  public:
+  void InitDirectoryPage() {
+    for (uint32_t i = 0; i < DIRECTORY_ARRAY_SIZE; i++) {
+      local_depths_[i] = 0;
+      bucket_page_ids_[i] = 0;
+    }
+    return;
+  }
+
   /**
    * @return the page ID of this page
    */
@@ -177,7 +185,7 @@ class HashTableDirectoryPage {
    * Verify the following invariants:
    * (1) All LD <= GD.
    * (2) Each bucket has precisely 2^(GD - LD) pointers pointing to it.
-   * (3) The LD is the same at each index with the same bucket_page_id
+   * (3) The LD is the same at each indeGetx with the same bucket_page_id
    */
   void VerifyIntegrity();
 
