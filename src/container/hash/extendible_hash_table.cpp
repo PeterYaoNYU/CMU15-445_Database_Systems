@@ -98,24 +98,40 @@ auto HASH_TABLE_TYPE::FetchDirectoryPage() -> HashTableDirectoryPage * {
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-auto HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_id) -> HASH_TABLE_BUCKET_TYPE * {
+auto HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_id) -> std::pair<Page*, HASH_TABLE_BUCKET_TYPE *> {
   auto BucketPage = buffer_pool_manager_->FetchPage(bucket_page_id);
   auto BucketPageData = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(BucketPage->GetData());
-  return BucketPageData;
+  auto bucket_page = reinterpret_cast<Page*>(BucketPage);
+  return std::make_pair(bucket_page, BucketPageData);
 }
+
+// template <typename KeyType, typename ValueType, typename KeyComparator>
+// auto HASH_TABLE_TYPE::FetchOnlyBucketPage(page_id_t bucket_page_id) -> Page * {
+//   auto bucket_page = buffer_pool_manager_->FetchPage(bucket_page_id);
+//   return reinterpret_cast<Page*>(bucket_page);
+// }
 
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) -> bool {
+  table_latch_.RLock();
+
   auto DirectoryPageData = FetchDirectoryPage();
   auto BucketPageId = KeyToPageId(key, DirectoryPageData);
-  auto BucketPageData = FetchBucketPage(BucketPageId);
+  auto [bucket_page, BucketPageData] = FetchBucketPage(BucketPageId);
+  // auto bucket_page = FetchOnlyBucketPage(BucketPageId);
+  bucket_page->RLatch();
+
   bool FoundFlag = BucketPageData->GetValue(key, comparator_, result);
   // std::cout<<"finding kv pair "<<key<<" and the result is "<<FoundFlag<<std::endl;
   buffer_pool_manager_->UnpinPage(BucketPageId, false);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+
+  bucket_page->RUnlatch();
+
+  table_latch_.RUnlock();
   return FoundFlag;
 }
 
@@ -124,16 +140,24 @@ auto HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) -> bool {
+  table_latch_.RLock();
+
   auto DirectoryPageData = FetchDirectoryPage();
   // std::cout<<"dir page fetched!"<<std::endl;
   auto BucketPageId = KeyToPageId(key, DirectoryPageData);
-  auto BucketPageData = FetchBucketPage(BucketPageId);
+  // auto BucketPageData = FetchBucketPage(BucketPageId);
+  auto [bucket_page, BucketPageData] = FetchBucketPage(BucketPageId);
+
+  // auto bucket_page = FetchOnlyBucketPage(BucketPageId);
+  bucket_page->WLatch();
 
   // std::cout<<"inserting kv pair "<<key<<value<<std::endl;
   if (BucketPageData->IsDuplicate(key, value, comparator_)) {
     // std::cout<<"cannot insert cuz there is duplicate"<<std::endl;
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(BucketPageId, false);
+    bucket_page->WUnlatch();
+    table_latch_.RUnlock();
     return false;
   }
 
@@ -141,23 +165,33 @@ auto HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
     // std::cout<<"cannot insert because the bucket is full"<<std::endl;
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
     buffer_pool_manager_->UnpinPage(BucketPageId, false);
+    bucket_page->WUnlatch();
+    table_latch_.RUnlock();
     return SplitInsert(transaction, key, value);
   }
 
   bool SuccessFlag = BucketPageData->Insert(key, value, comparator_);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
   buffer_pool_manager_->UnpinPage(BucketPageId, true);
+  bucket_page->WUnlatch();
+  table_latch_.RUnlock();
   return SuccessFlag;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, const ValueType &value) -> bool {
+  table_latch_.WLock();
+
   auto DirectoryPageData = FetchDirectoryPage();
   auto BucketPageId = KeyToPageId(key, DirectoryPageData);
-  auto BucketPageData = FetchBucketPage(BucketPageId);
+  // auto BucketPageData = FetchBucketPage(BucketPageId);
+  auto [bucket_page, BucketPageData] = FetchBucketPage(BucketPageId);
+  // auto bucket_page = FetchOnlyBucketPage(BucketPageId);
+
+
   page_id_t NewPageId;
-  // Page * NewPage = buffer_pool_manager_->NewPage(&NewPageId);
-  buffer_pool_manager_->NewPage(&NewPageId);
+  Page * new_page = buffer_pool_manager_->NewPage(&NewPageId);
+  // buffer_pool_manager_->NewPage(&NewPageId);
 
   // auto NewPageData = reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(NewPage->GetData());
 
@@ -194,25 +228,41 @@ auto HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
       }
     }
   }
-
+  std::cout<<"before latching the new page and the old bucket page"<<std::endl;
+  new_page->WLatch();
+  bucket_page->WLatch();
+  std::cout<<"after latching the new page and the old bucket page"<<std::endl;
 
   for (uint32_t i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (BucketPageData->IsReadable(i)) {
       auto OldKey = BucketPageData->KeyAt(i);
       auto OldValue = BucketPageData->ValueAt(i);
       BucketPageData->RemoveAt(i);
+      bucket_page->WUnlatch();
+      new_page->WUnlatch();
+      table_latch_.WUnlock();
+      std::cout<<"after temporarily unlatching the new page and the old bucket page"<<std::endl;
+
       Insert(transaction, OldKey, OldValue);
+      table_latch_.WLock();
+      new_page->WLatch();
+      bucket_page->WLatch();
     }
   }
+  bucket_page->WUnlatch();
+  new_page->WUnlatch();
+  table_latch_.WUnlock();
+  // std::cout<<"after unlatching the new page and the old bucket page"<<std::endl;
+
 
   bool SuccessFlag = Insert(transaction, key, value);
 
-  DirectoryPageData->PrintDirectory();
+  // DirectoryPageData->PrintDirectory();
 
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
   buffer_pool_manager_->UnpinPage(BucketPageId, true);
   buffer_pool_manager_->UnpinPage(NewPageId, true);
-
+  // table_latch_.WUnlock();
 
   return SuccessFlag;
 }
@@ -222,21 +272,30 @@ auto HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 auto HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) -> bool {
+  table_latch_.RLock();
   auto dir_page_data = FetchDirectoryPage();
   auto bucket_page_id = KeyToPageId(key, dir_page_data);
-  auto bucket_page_data = FetchBucketPage(bucket_page_id);
+  // auto bucket_page_data = FetchBucketPage(bucket_page_id);
+  // auto bucket_page = FetchOnlyBucketPage(bucket_page_id);
+  auto [bucket_page, bucket_page_data] = FetchBucketPage(bucket_page_id);
+
+  bucket_page->WLatch();
   
   bool success_flag = bucket_page_data->Remove(key, value, comparator_);
   
   if (bucket_page_data->IsEmpty()){
     buffer_pool_manager_->UnpinPage(bucket_page_id, true);
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    bucket_page->WUnlatch();
+    table_latch_.RUnlock();
     Merge(transaction, key, value);
     return success_flag;
   }
 
   buffer_pool_manager_->UnpinPage(bucket_page_id, true);
   buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+  bucket_page->WUnlatch();
+  table_latch_.RUnlock();
 
   return success_flag;
 }
@@ -247,16 +306,23 @@ auto HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const ValueType &value) {
   // std::cout<<"start merging for kv pair "<< key<< " "<<value<<std::endl;
+  table_latch_.WLock();
   auto dir_page_data = FetchDirectoryPage();
   auto bucket_dir_idx = KeyToDirectoryIndex(key, dir_page_data);
   auto bucket_page_id = KeyToPageId(key, dir_page_data);
-  auto bucket_page_data = FetchBucketPage(bucket_page_id);
+  // auto bucket_page_data = FetchBucketPage(bucket_page_id);
+  auto [bucket_page, bucket_page_data] = FetchBucketPage(bucket_page_id);
+  // auto bucket_page = FetchOnlyBucketPage(bucket_page_id);
+  bucket_page->WLatch();
+
   auto old_local_depth = dir_page_data->GetLocalDepth(bucket_dir_idx);
   
   if ((!bucket_page_data->IsEmpty()) || old_local_depth<=0){
     // std::cout<<""
     buffer_pool_manager_->UnpinPage(bucket_page_id, false);
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    bucket_page->WUnlatch();
+    table_latch_.WUnlock();
     return;
   }
 
@@ -266,6 +332,8 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
     // std::cout<< "Merge: two depths don;t match: "<<bucket_dir_idx, 
     buffer_pool_manager_->UnpinPage(bucket_page_id, false);
     buffer_pool_manager_->UnpinPage(directory_page_id_, false);
+    bucket_page->WUnlatch();
+    table_latch_.WUnlock();
     return;
   }
 
@@ -304,6 +372,8 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
   buffer_pool_manager_->UnpinPage(directory_page_id_, true);
 
   buffer_pool_manager_->DeletePage(bucket_page_id);
+  bucket_page->WUnlatch();
+  table_latch_.WUnlock();
 }
 
 /*****************************************************************************
