@@ -64,6 +64,12 @@ void HashTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) { local_depths_
 
 auto HashTableDirectoryPage::GetLocalHighBit(uint32_t bucket_idx) -> uint32_t { return 0; }
 
+auto HashTableDirectoryPage::GetSplitImageIndex(uint32_t bucket_idx) -> uint32_t {
+  auto old_local_depth = GetLocalDepth(bucket_idx);
+  return bucket_idx^(0x1<<(old_local_depth-1));
+}
+
+
 /**
  * VerifyIntegrity - Use this for debugging but **DO NOT CHANGE**
  *
@@ -83,6 +89,7 @@ void HashTableDirectoryPage::VerifyIntegrity() {
   for (uint32_t curr_idx = 0; curr_idx < Size(); curr_idx++) {
     page_id_t curr_page_id = bucket_page_ids_[curr_idx];
     uint32_t curr_ld = local_depths_[curr_idx];
+    std::cout<< "curr_idx, global_depth, curr_ld: "<<curr_idx<<global_depth_<<curr_ld<<std::endl;
     assert(curr_ld <= global_depth_);
 
     ++page_id_to_count[curr_page_id];

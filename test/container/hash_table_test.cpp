@@ -92,32 +92,33 @@ TEST(HashTableTest, SampleTest) {
   EXPECT_EQ(0, res.size());
 
   // delete some values
-  // for (int i = 0; i < 5; i++) {
-  //   EXPECT_TRUE(ht.Remove(nullptr, i, i));
-  //   std::vector<int> res;
-  //   ht.GetValue(nullptr, i, &res);
-  //   if (i == 0) {
-  //     // (0, 0) is the only pair with key 0
-  //     EXPECT_EQ(0, res.size());
-  //   } else {
-  //     EXPECT_EQ(1, res.size());
-  //     EXPECT_EQ(2 * i, res[0]);
-  //   }
-  // }
+  for (int i = 0; i < 50000; i++) {
+    EXPECT_TRUE(ht.Remove(nullptr, i, i));
+    std::vector<int> res;
+    ht.GetValue(nullptr, i, &res);
+    if (i == 0) {
+      // (0, 0) is the only pair with key 0
+      EXPECT_EQ(0, res.size());
+    } else {
+      EXPECT_EQ(1, res.size());
+      EXPECT_EQ(2 * i, res[0]);
+    }
+  }
 
-  // ht.VerifyIntegrity();
+  ht.VerifyIntegrity();
 
-  // // delete all values
-  // for (int i = 0; i < 5; i++) {
-  //   if (i == 0) {
-  //     // (0, 0) has been deleted
-  //     EXPECT_FALSE(ht.Remove(nullptr, i, 2 * i));
-  //   } else {
-  //     EXPECT_TRUE(ht.Remove(nullptr, i, 2 * i));
-  //   }
-  // }
+  // delete all values
+  for (int i = 0; i < 50000; i++) {
+    printf("finally deleting %d\n", i);
+    if (i == 0) {
+      // (0, 0) has been deleted
+      EXPECT_FALSE(ht.Remove(nullptr, i, 2 * i));
+    } else {
+      EXPECT_TRUE(ht.Remove(nullptr, i, 2 * i));
+    }
+  }
 
-  // ht.VerifyIntegrity();
+  ht.VerifyIntegrity();
 
   disk_manager->ShutDown();
   remove("test.db");
