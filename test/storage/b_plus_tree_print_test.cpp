@@ -38,7 +38,7 @@ auto UsageMessage() -> std::string {
 }
 
 // Remove 'DISABLED_' when you are ready
-TEST(BptTreeTest, DISABLED_UnitTest) {
+TEST(BptTreeTest, UnitTest) {
   int64_t key = 0;
   GenericKey<8> index_key;
   RID rid;
@@ -51,6 +51,11 @@ TEST(BptTreeTest, DISABLED_UnitTest) {
   std::cout << UsageMessage();
   std::cin >> leaf_max_size;
   std::cin >> internal_max_size;
+  // std::cin.ignore(10000, '\n');
+  // std::cin.clear();
+  // std::cin.ignore(10000, '\n');
+
+  LOG_DEBUG("cin clearin");
 
   // create KeyComparator and index schema
   std::string create_stmt = "a bigint";
@@ -80,10 +85,12 @@ TEST(BptTreeTest, DISABLED_UnitTest) {
         tree.Remove(index_key, transaction);
         break;
       case 'i':
+        // std::cin.ignore(10,'\n');
         std::cin >> key;
         rid.Set(static_cast<int32_t>(key >> 32), static_cast<int>(key & 0xFFFFFFFF));
         index_key.SetFromInteger(key);
         tree.Insert(index_key, rid, transaction);
+        // std::cout<<"index key: "<<index_key<<std::endl;
         break;
       case 'f':
         std::cin >> filename;
