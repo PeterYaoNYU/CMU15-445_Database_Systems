@@ -41,7 +41,9 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, uint32_t 
     free_list_.emplace_back(static_cast<int>(i));
   }
 
-  // printf("basic info: pool size: %d\n num_instances: %d\n, instance_index: %d\n", (int)pool_size, (int)num_instances, (int)instance_index);
+  // printf("basic info: pool size: %d\n num_instances: %d\n, instance_index: %d\n", (int)pool_size, (int)num_instances,
+  //        (int)instance_index);
+
 }
 
 BufferPoolManagerInstance::~BufferPoolManagerInstance() {
@@ -65,10 +67,10 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   std::lock_guard<std::mutex> lck(latch_);
   // printf("flushing %d\n", (int)page_id);
 
-  if (page_id == INVALID_PAGE_ID) return false;
+  if (page_id == INVALID_PAGE_ID) {return false;}
 
   int frame_id = find_frame_id(page_id);
-  if (frame_id == -1) return false;
+  if (frame_id == -1) {return false;}
 
   flush_pg(page_id, frame_id);
 
@@ -107,25 +109,25 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   // printf("new pg imp\n");
 
   bool all_pinned = true;
-  for (size_t i =0; i<pool_size_; ++i){
-    if (pages_[i].GetPinCount() <= 0){
+  for (size_t i = 0; i < pool_size_; ++i) {
+    if (pages_[i].GetPinCount() <= 0) {
       all_pinned = false;
       break;
     }
   }
 
-  if (all_pinned){
+  if (all_pinned) {
     return nullptr;
   }
 
   frame_id_t frame_id_;
 
-  if (!free_list_.empty()){
+  if (!free_list_.empty()) {
     frame_id_ = free_list_.front();
     free_list_.pop_front();
-  } else if (replacer_->Victim(&frame_id_)){
+  } else if (replacer_->Victim(&frame_id_)) {
     auto old_page_id_ = pages_[frame_id_].GetPageId();
-    if (pages_[frame_id_].IsDirty()){
+    if (pages_[frame_id_].IsDirty()) {
       disk_manager_->WritePage(old_page_id_, pages_[frame_id_].GetData());
       pages_[frame_id_].is_dirty_ = false;
     }
@@ -142,7 +144,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
 
   memset(pages_[frame_id_].GetData(), 0, PAGE_SIZE);
   pages_[frame_id_].page_id_ = new_page_id_;
-  pages_[frame_id_].pin_count_ =1;
+  pages_[frame_id_].pin_count_ = 1;
   pages_[frame_id_].is_dirty_ = false;
 
   page_table_.emplace(new_page_id_, frame_id_);
@@ -174,26 +176,26 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     // pages_[frame_id].is_dirty_=true;
     return &pages_[frame_id];
   } else {
-    if (!free_list_.empty()){
+    if (!free_list_.empty()) {
       frame_id = free_list_.front();
       free_list_.pop_front();    
       // printf("fetching page %d: get from freelist \n", page_id);
     } else if (replacer_->Victim(&frame_id)) {
       // printf("fetching page %d: got from lru waitlist, frame id: %d\n", page_id, frame_id);
       auto old_page_id = pages_[frame_id].GetPageId();
-      if (pages_[frame_id].IsDirty()){
+      if (pages_[frame_id].IsDirty()) {
         disk_manager_->WritePage(old_page_id, pages_[frame_id].GetData());
         pages_[frame_id].is_dirty_ = false;
       }
       page_table_.erase(old_page_id);
       // pages_[frame_id].is_dirty_ = false;
-    } else{
+    } else {
       return nullptr;
     }
 
     replacer_->Pin(frame_id);
     page_table_.emplace(page_id, frame_id);
-    pages_[frame_id].page_id_=page_id;
+    pages_[frame_id].page_id_ = page_id;
     pages_[frame_id].pin_count_++;
     pages_[frame_id].is_dirty_ = false;
     disk_manager_->ReadPage(page_id, pages_[frame_id].GetData());
@@ -212,7 +214,6 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
 
   // printf("deleting\n");
 
-
   frame_id_t frame_id = find_frame_id(page_id);
   if (frame_id < 0) {
     return true;
@@ -222,7 +223,7 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
     }
 
     // flush the content
-    if (pages_[frame_id].IsDirty()){
+    if (pages_[frame_id].IsDirty()) {
       disk_manager_->WritePage(page_id, pages_[frame_id].GetData());
     }
     // remove it fron the page table
@@ -257,17 +258,15 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
   }
 
   // printf("check done\n");
-  if (pages_[frame_id].pin_count_<=0){
+  if (pages_[frame_id].pin_count_ <= 0) {
     return false;
   }
 
   if (--pages_[frame_id].pin_count_ == 0) {
     replacer_->Unpin(frame_id);
-    if (pages_[frame_id].is_dirty_){
+    if (pages_[frame_id].is_dirty_) {
       disk_manager_->WritePage(page_id, pages_[frame_id].GetData());
     }
-
-
   }
 
   pages_[frame_id].is_dirty_ = is_dirty;

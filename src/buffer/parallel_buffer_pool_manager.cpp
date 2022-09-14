@@ -87,7 +87,7 @@ auto ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) -> Page * {
     // starting_index = (starting_index + 1) % num_instances_;
     if ((page_ptr = managers_[starting_index]->NewPage(page_id)) != nullptr) {
       return page_ptr;
-    } else{
+    } else {
       starting_index = (starting_index + 1) % num_instances_;
     }
   }

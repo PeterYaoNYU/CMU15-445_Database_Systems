@@ -47,6 +47,8 @@ class HashTableBucketPage {
    */
   auto GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result) -> bool;
 
+  auto IsDuplicate(KeyType key, ValueType value, KeyComparator cmp) -> bool;
+
   /**
    * Attempts to insert a key and value in the bucket.  Uses the occupied_
    * and readable_ arrays to keep track of each slot's availability.
@@ -63,6 +65,8 @@ class HashTableBucketPage {
    * @return true if removed, false if not found
    */
   auto Remove(KeyType key, ValueType value, KeyComparator cmp) -> bool;
+
+  void SetUnReadable(uint32_t bucket_idx);
 
   /**
    * Gets the key at an index in the bucket.
