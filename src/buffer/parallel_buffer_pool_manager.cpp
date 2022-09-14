@@ -28,11 +28,11 @@ ParallelBufferPoolManager::ParallelBufferPoolManager(size_t num_instances, size_
 
 // Update constructor to destruct all BufferPoolManagerInstances and deallocate any associated memory
 ParallelBufferPoolManager::~ParallelBufferPoolManager() {
-  printf("destructing...\n");
+  // printf("destructing...\n");
   for (size_t i =0; i < num_instances_; i++){
     delete managers_[i];
   }
-  printf("done destructing each manager instance\n");
+  // printf("done destructing each manager instance\n");
   // delete &managers_;
   // printf("done destructing all \n");
 }
@@ -79,7 +79,7 @@ auto ParallelBufferPoolManager::NewPgImp(page_id_t *page_id) -> Page * {
   // starting index and return nullptr
   // 2.   Bump the starting index (mod number of instances) to start search at a different BPMI each time this function
   // is called
-  printf("calling new page imp\n");
+  // printf("calling new page imp\n");
   // return nullptr;
   size_t trials = 0;
   Page *page_ptr;
